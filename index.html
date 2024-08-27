@@ -1,0 +1,253 @@
+import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PlusCircle, Trash2, Edit2, DollarSign, Percent } from 'lucide-react';
+
+const Account = ({ account, onUpdate, onDelete }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedAccount, setEditedAccount] = useState(account);
+
+  const handleEdit = () => {
+    setIsEditing(true);
+  };
+
+  const handleSave = () => {
+    onUpdate(editedAccount);
+    setIsEditing(false);
+  };
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="bg-gray-900 p-4 rounded-lg mb-4 border border-green-500 shadow-lg shadow-green-500/50"
+    >
+      {isEditing ? (
+        <div className="space-y-2">
+          <Input
+            value={editedAccount.name}
+            onChange={(e) => setEditedAccount({ ...editedAccount, name: e.target.value })}
+            className="bg-gray-800 text-green-400 border-green-500 focus:border-green-300"
+            placeholder="Account Name"
+          />
+          <div className="relative">
+            <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-500" size={16} />
+            <Input
+              type="number"
+              value={editedAccount.balance}
+              onChange={(e) => setEditedAccount({ ...editedAccount, balance: parseFloat(e.target.value) || 0 })}
+              className="bg-gray-800 text-green-400 border-green-500 focus:border-green-300 pl-10"
+              placeholder="Balance"
+            />
+          </div>
+          <div className="relative">
+            <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-500" size={16} />
+            <Input
+              type="number"
+              value={editedAccount.interestRate}
+              onChange={(e) => setEditedAccount({ ...editedAccount, interestRate: parseFloat(e.target.value) || 0 })}
+              className="bg-gray-800 text-green-400 border-green-500 focus:border-green-300 pl-10"
+              placeholder="Interest Rate"
+            />
+          </div>
+          <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 text-black font-bold">SAVE</Button>
+        </div>
+      ) : (
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="text-lg font-semibold text-green-400">{account.name}</h3>
+            <p className="text-green-300">Balance: ${account.balance.toFixed(2)}</p>
+            <p className="text-green-300">Interest Rate: {account.interestRate}%</p>
+          </div>
+          <div className="space-x-2">
+            <Button onClick={handleEdit} className="bg-yellow-600 hover:bg-yellow-700 text-black font-bold p-2">
+              <Edit2 size={16} />
+            </Button>
+            <Button onClick={() => onDelete(account.id)} className="bg-red-600 hover:bg-red-700 text-black font-bold p-2">
+              <Trash2 size={16} />
+            </Button>
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
+const InterestCalculator = () => {
+  const [accounts, setAccounts] = useState([
+    { id: 1, name: 'Savings', balance: 1000, interestRate: 1.26 },
+    { id: 2, name: 'Investment', balance: 5000, interestRate: 5.5 }
+  ]);
+  const [taxRate, setTaxRate] = useState(19);
+  const [isDailyCompounding, setIsDailyCompounding] = useState(true);
+
+  const calculateCompoundInterest = (principal, rate, time, n) => {
+    const r = rate / 100;
+    const amount = principal * Math.pow(1 + r / n, n * time);
+    return amount - principal;
+  };
+
+  const calculateTax = (interest) => {
+    return interest * (taxRate / 100);
+  };
+
+  const twentyFiveYearProjection = useMemo(() => {
+    return Array.from({ length: 25 }, (_, i) => {
+      const year = i + 1;
+      let totalBalance = 0;
+      let totalAccruedInterest = 0;
+
+      accounts.forEach(account => {
+        const interest = calculateCompoundInterest(account.balance, account.interestRate, year, isDailyCompounding ? 365 : 12);
+        const tax = calculateTax(interest);
+        totalBalance += account.balance + interest - tax;
+        totalAccruedInterest += interest - tax;
+      });
+
+      return {
+        year,
+        totalBalance,
+        totalAccruedInterest,
+      };
+    });
+  }, [accounts, taxRate, isDailyCompounding]);
+
+  const averageInterestRate = useMemo(() => {
+    const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
+    const weightedSum = accounts.reduce((sum, account) => sum + account.balance * account.interestRate, 0);
+    return totalBalance > 0 ? weightedSum / totalBalance : 0;
+  }, [accounts]);
+
+  const netInterestRate = averageInterestRate * (1 - taxRate / 100);
+
+  const totalInterestEarned = twentyFiveYearProjection[twentyFiveYearProjection.length - 1].totalAccruedInterest;
+
+  const addAccount = () => {
+    const newAccount = {
+      id: Date.now(),
+      name: `Account ${accounts.length + 1}`,
+      balance: 0,
+      interestRate: 1
+    };
+    setAccounts([...accounts, newAccount]);
+  };
+
+  const updateAccount = (updatedAccount) => {
+    setAccounts(accounts.map(account => 
+      account.id === updatedAccount.id ? updatedAccount : account
+    ));
+  };
+
+  const deleteAccount = (id) => {
+    setAccounts(accounts.filter(account => account.id !== id));
+  };
+
+  return (
+    <div className="min-h-screen bg-black flex items-center justify-center p-4 text-green-400 font-mono">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-4xl"
+      >
+        <h1 className="text-4xl font-bold mb-8 text-center text-green-500">[ COMPOUND INTEREST HACKER ]</h1>
+        <Card className="bg-gray-900 border-green-500 shadow-xl">
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-6">
+                <div>
+                  <Label htmlFor="taxRate" className="text-green-400 mb-1 block">TAX RATE (%)</Label>
+                  <div className="relative">
+                    <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-500" size={16} />
+                    <Input
+                      id="taxRate"
+                      type="number"
+                      value={taxRate}
+                      onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
+                      className="bg-gray-800 text-green-400 border-green-500 focus:border-green-300 pl-10"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="compoundingFrequency"
+                    checked={isDailyCompounding}
+                    onCheckedChange={setIsDailyCompounding}
+                    className="bg-green-600"
+                  />
+                  <Label htmlFor="compoundingFrequency" className="text-green-400">
+                    {isDailyCompounding ? 'DAILY' : 'MONTHLY'} COMPOUNDING
+                  </Label>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold mb-4 text-green-500">[ ACCOUNTS ]</h3>
+                  <AnimatePresence>
+                    {accounts.map(account => (
+                      <Account
+                        key={account.id}
+                        account={account}
+                        onUpdate={updateAccount}
+                        onDelete={deleteAccount}
+                      />
+                    ))}
+                  </AnimatePresence>
+                  <Button onClick={addAccount} className="mt-4 bg-green-600 hover:bg-green-700 text-black font-bold">
+                    <PlusCircle className="mr-2" size={16} /> ADD ACCOUNT
+                  </Button>
+                </div>
+                <div className="bg-gray-800 p-4 rounded-lg border border-green-500">
+                  <h3 className="text-xl font-semibold mb-2 text-green-500">[ SUMMARY ]</h3>
+                  <p className="text-green-400">Average Interest Rate: {averageInterestRate.toFixed(2)}%</p>
+                  <p className="text-green-400">Net Interest Rate (After Tax): {netInterestRate.toFixed(2)}%</p>
+                  <p className="text-green-400">Total Interest Earned (25 years): ${totalInterestEarned.toFixed(2)}</p>
+                </div>
+              </div>
+              <motion.div 
+                className="space-y-8"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+              >
+                <div>
+                  <h3 className="text-xl font-semibold mb-4 text-green-500">[ TOTAL VALUE PROJECTION (25 YEARS) ]</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={twentyFiveYearProjection}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#2f855a" />
+                      <XAxis dataKey="year" stroke="#48bb78" />
+                      <YAxis stroke="#48bb78" />
+                      <Tooltip contentStyle={{ backgroundColor: '#1a202c', border: '1px solid #2f855a' }} />
+                      <Legend />
+                      <Line type="monotone" dataKey="totalBalance" stroke="#38a169" name="Total Value" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold mb-4 text-green-500">[ ACCRUED INTEREST PROJECTION (25 YEARS) ]</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={twentyFiveYearProjection}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#2f855a" />
+                      <XAxis dataKey="year" stroke="#48bb78" />
+                      <YAxis stroke="#48bb78" />
+                      <Tooltip contentStyle={{ backgroundColor: '#1a202c', border: '1px solid #2f855a' }} />
+                      <Legend />
+                      <Line type="monotone" dataKey="totalAccruedInterest" stroke="#f6ad55" name="Accrued Interest" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </motion.div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </div>
+  );
+};
+
+export default InterestCalculator;
